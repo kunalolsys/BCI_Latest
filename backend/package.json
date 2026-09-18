@@ -1,0 +1,45 @@
+{
+  "name": "bci-bms-backend",
+  "version": "1.0.0",
+  "description": "Backend for Business Coaching India Backoffice Management System (BCI BMS)",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js",
+    "lint": "eslint .",
+    "seed:admin": "node src/config/seedAdmin.js",
+    "seed:roles": "node src/config/seedRoles.js",
+    "seed:workshoptypes": "node src/config/seedWorkshopTypes.js"
+  },
+  "keywords": [
+    "BCI",
+    "MERN",
+    "backend",
+    "express",
+    "mongodb"
+  ],
+  "author": "BCI Team",
+  "license": "MIT",
+  "dependencies": {
+    "bcrypt": "^5.1.1",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.5",
+    "crypto": "^1.0.1",
+    "dotenv": "^16.5.0",
+    "express": "^5.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "moment": "^2.30.1",
+    "mongoose": "^8.14.1",
+    "morgan": "^1.10.0",
+    "multer": "^1.4.5-lts.1",
+    "node-cron": "^4.1.0",
+    "nodemailer": "^7.0.3",
+    "socket-io": "^1.0.0",
+    "socket.io": "^4.8.1"
+  },
+  "devDependencies": {
+    "eslint": "^9.25.1",
+    "nodemon": "^3.1.10",
+    "prettier": "^3.5.3"
+  }
+}
