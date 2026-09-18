@@ -92,6 +92,10 @@ const workshopTaskSchema = new mongoose.Schema({
   completedOn: {
     type: Date
   },
+  completedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Employee',
+  },
   documents: [{
     filename: {
       type: String,

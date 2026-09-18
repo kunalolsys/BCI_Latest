@@ -506,8 +506,7 @@ exports.getWorkshop = async (req, res) => {
 
     const tasks = await WorkshopTask.find({ workshop: id })
       .populate('department', 'name')
-      .populate('doer', 'name email');
-
+      .populate('doer', 'name email').populate('completedBy', 'name email');
     return res.status(200).json({
       workshop: {
         ...workshop.toObject(),
@@ -715,7 +714,7 @@ exports.completeWorkshop = async (req, res) => {
     const pendingTasks = await WorkshopTask.find({
       workshop: id,
       status: { $ne: 'Completed' }
-    });
+    }).populate('completedBy', 'name email');;
 
     if (pendingTasks.length > 0) {
       return res.status(400).json({
@@ -738,7 +737,7 @@ exports.completeWorkshop = async (req, res) => {
 
     const tasks = await WorkshopTask.find({ workshop: id })
       .populate('department', 'name')
-      .populate('doer', 'name email');
+      .populate('doer', 'name email').populate('completedBy', 'name email');
 
     return res.status(200).json({
       workshop: {
@@ -883,6 +882,7 @@ exports.markTaskCompleted = async (req, res) => {
     }
     task.status = 'Completed';
     task.completedOn = new Date();
+    task.completedBy = req.user._id;
     // Set NARemark if provided
     if (NARemark !== undefined) {
       task.NARemark = NARemark;
