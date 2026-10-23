@@ -286,12 +286,30 @@ const groupDepartmentalTasks = (tasks) => {
 };
 
 // Departmental tasks table — groups -D-1, -D-2 etc. into one row per base task
+
+// Helper function to calculate delay in calendar days
+const getDelayInDays = (dueDate, completedDate) => {
+  if (!dueDate || !completedDate) return "N/A";
+
+  const due = new Date(dueDate);
+  const completed = new Date(completedDate);
+
+  due.setHours(0, 0, 0, 0);
+  completed.setHours(0, 0, 0, 0);
+
+  const diffTime = completed.getTime() - due.getTime();
+  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+  return diffDays > 0 ? `${diffDays} Day(s)` : "0 Days";
+};
+
 function DepartmentalTasksTable({
   tasks,
   statusFilter,
   onViewChecklist,
-  visibleColumns,
+  visibleColumns = {},
   toggleColumnVisibility,
+  isCompletedTab = false,
 }) {
   const overallStatus = (group) => {
     // If any task is not completed, then status is Pending. Otherwise Completed.
@@ -308,7 +326,8 @@ function DepartmentalTasksTable({
     return true;
   });
 
-  const columns = [
+  // Base master columns
+  const allMasterColumns = [
     { key: "taskId", label: "Task ID", width: "w-[240px]", align: "text-left" },
     {
       key: "description",
@@ -334,6 +353,27 @@ function DepartmentalTasksTable({
       width: "w-[140px]",
       align: "text-left",
     },
+    {
+      key: "completedAt",
+      label: "Completed At",
+      width: "w-[180px]",
+      align: "text-left",
+      isCompletedOnly: true,
+    },
+    {
+      key: "completedBy",
+      label: "Completed By",
+      width: "w-[200px]",
+      align: "text-left",
+      isCompletedOnly: true,
+    },
+    {
+      key: "delay",
+      label: "Delay (Days)",
+      width: "w-[150px]",
+      align: "text-left",
+      isCompletedOnly: true,
+    },
     { key: "status", label: "Status", width: "w-[130px]", align: "text-left" },
     {
       key: "checklist",
@@ -343,43 +383,55 @@ function DepartmentalTasksTable({
     },
   ];
 
+  // 🚀 Filter active tab columns dynamically
+  const columns = allMasterColumns.filter(
+    (col) => !col.isCompletedOnly || isCompletedTab,
+  );
+
+  // Calculate dynamic colSpan & active hidden state for current tab
   const visibleColumnCount = columns.filter(
-    (col) => visibleColumns[col.key],
+    (col) => visibleColumns[col.key] !== false,
   ).length;
-  const hiddenCardActive = columns.some((col) => !visibleColumns[col.key]);
+
+  const hiddenCardActive = columns.some(
+    (col) => visibleColumns[col.key] === false,
+  );
+
   const cardRef = React.useRef(null);
 
   return (
     <>
-      {/* Hidden Columns Controls - always visible above the table */}
+      {/* Hidden Columns Ribbon */}
       {hiddenCardActive && (
         <div
           ref={cardRef}
-          className="w-auto mb-2 p-3 bg-gray-50 rounded-lg border border-gray-200"
+          className="w-auto mb-2 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 flex-none"
         >
           <div className="flex items-center gap-2 mb-2">
-            <Eye className="h-4 w-4 text-gray-600" />
-            <span className="text-sm font-medium text-gray-700">
+            <Eye className="h-4 w-4 text-gray-600 dark:text-gray-300" />
+            <span className="text-sm font-medium text-gray-700 dark:text-gray-200">
               Hidden Columns:
             </span>
           </div>
           <div className="flex flex-wrap gap-2">
             {columns.map(
               (col) =>
-                !visibleColumns[col.key] && (
+                visibleColumns[col.key] === false && (
                   <button
                     key={col.key}
                     type="button"
                     onClick={() => toggleColumnVisibility(col.key)}
-                    className="cursor-pointer px-2 py-1 text-xs bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition"
+                    className="cursor-pointer px-2 py-1 text-xs bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded hover:bg-gray-300 dark:hover:bg-gray-600 transition"
                   >
-                    {col.label}
+                    + {col.label}
                   </button>
                 ),
             )}
           </div>
         </div>
       )}
+
+      {/* Main Table Container */}
       <div
         className="relative flex flex-col w-full overflow-hidden"
         style={{ height: hiddenCardActive ? "calc(100% - 80px)" : "inherit" }}
@@ -393,7 +445,7 @@ function DepartmentalTasksTable({
               <tr>
                 {columns.map(
                   (col) =>
-                    visibleColumns[col.key] && (
+                    visibleColumns[col.key] !== false && (
                       <th
                         key={col.key}
                         className={`px-6 py-3 text-xs font-bold text-gray-700 dark:text-gray-200 uppercase tracking-wider border-b border-gray-200 dark:border-gray-800 ${col.width} ${col.align}`}
@@ -408,7 +460,7 @@ function DepartmentalTasksTable({
                             className="cursor-pointer p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition"
                             title={`Hide ${col.label} column`}
                           >
-                            <EyeOff className="h-3 w-3 text-gray-500" />
+                            <EyeOff className="h-3 w-3 text-gray-500 dark:text-gray-400" />
                           </button>
                         </div>
                       </th>
@@ -420,111 +472,168 @@ function DepartmentalTasksTable({
               {grouped.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={visibleColumnCount}
+                    colSpan={visibleColumnCount || 1}
                     className="text-center py-8 text-gray-400"
                   >
                     No departmental tasks.
                   </td>
                 </tr>
               ) : (
-                grouped.map((group) => (
-                  <tr
-                    key={group.taskId}
-                    className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition"
-                  >
-                    {visibleColumns.taskId && (
-                      <td className="px-6 py-4 w-[240px]">
-                        <div className="flex items-center gap-1 break-words whitespace-normal">
-                          {group.taskId}
-                          {group.isCritical && (
-                            <Star
-                              className="h-4 w-4 text-amber-500 flex-shrink-0"
-                              fill="currentColor"
-                            />
+                grouped.map((group) => {
+                  // Get completed timestamp/user from the first task instance in group
+                  const sampleTask = group.allTasks?.[0] || {};
+                  const completedDate =
+                    sampleTask.completedOn || sampleTask.updatedAt;
+                  const completedByObj = sampleTask.completedBy;
+                  const completedByName =
+                    typeof completedByObj === "object"
+                      ? completedByObj?.name
+                      : completedByObj;
+
+                  return (
+                    <tr
+                      key={group.taskId}
+                      className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition"
+                    >
+                      {visibleColumns.taskId !== false && (
+                        <td className="px-6 py-4 w-[240px]">
+                          <div className="flex items-center gap-1 break-words whitespace-normal">
+                            {group.taskId}
+                            {group.isCritical && (
+                              <Star
+                                className="h-4 w-4 text-amber-500 flex-shrink-0"
+                                fill="currentColor"
+                              />
+                            )}
+                          </div>
+                          {group.isDailyTask && (
+                            <span className="text-xs text-gray-500 dark:text-gray-400">
+                              {(() => {
+                                const instanceGroups = {};
+                                group.allTasks.forEach((t) => {
+                                  const instanceId =
+                                    t.taskId?.split("/")[0] || "default";
+                                  if (!instanceGroups[instanceId]) {
+                                    instanceGroups[instanceId] = 0;
+                                  }
+                                  instanceGroups[instanceId]++;
+                                });
+                                const counts = Object.values(instanceGroups);
+                                return counts.length > 0
+                                  ? Math.max(...counts)
+                                  : 0;
+                              })()}{" "}
+                              daily entries
+                            </span>
                           )}
-                        </div>
-                        {group.isDailyTask && (
-                          <span className="text-xs text-gray-500 dark:text-gray-400">
-                            {(() => {
-                              const instanceGroups = {};
-                              group.allTasks.forEach((t) => {
-                                const instanceId =
-                                  t.taskId?.split("/")[0] || "default";
-                                if (!instanceGroups[instanceId]) {
-                                  instanceGroups[instanceId] = 0;
-                                }
-                                instanceGroups[instanceId]++;
-                              });
-                              const counts = Object.values(instanceGroups);
-                              return counts.length > 0
-                                ? Math.max(...counts)
-                                : 0;
-                            })()}{" "}
-                            daily entries
-                          </span>
+                        </td>
+                      )}
+
+                      {visibleColumns.description !== false && (
+                        <td className="px-6 py-4 font-medium w-[380px]">
+                          <div className="break-words whitespace-normal">
+                            {group.narration || "No description"}
+                          </div>
+                        </td>
+                      )}
+
+                      {visibleColumns.department !== false && (
+                        <td className="px-6 py-4 w-[180px]">
+                          <div className="break-words whitespace-normal">
+                            {group.department?.name || "—"}
+                          </div>
+                        </td>
+                      )}
+
+                      {visibleColumns.frequency !== false && (
+                        <td className="px-6 py-4 w-[160px]">
+                          <div className="break-words whitespace-normal">
+                            {group.frequency || "—"}
+                          </div>
+                        </td>
+                      )}
+
+                      {visibleColumns.dueDate !== false && (
+                        <td className="px-6 py-4 w-[140px]">
+                          <div className="break-words whitespace-normal">
+                            {formatDate(group.endDate)}
+                          </div>
+                        </td>
+                      )}
+
+                      {/* 🚀 Rendered ONLY on Completed Tab */}
+                      {isCompletedTab &&
+                        visibleColumns.completedAt !== false && (
+                          <td className="px-6 py-4 w-[180px]">
+                            <div className="break-words whitespace-normal">
+                              {completedDate
+                                ? formatDate(completedDate)
+                                : "N/A"}
+                            </div>
+                          </td>
                         )}
-                      </td>
-                    )}
-                    {visibleColumns.description && (
-                      <td className="px-6 py-4 font-medium w-[380px]">
-                        <div className="break-words whitespace-normal">
-                          {group.narration || "No description"}
-                        </div>
-                      </td>
-                    )}
-                    {visibleColumns.department && (
-                      <td className="px-6 py-4 w-[180px]">
-                        <div className="break-words whitespace-normal">
-                          {group.department?.name || "—"}
-                        </div>
-                      </td>
-                    )}
-                    {visibleColumns.frequency && (
-                      <td className="px-6 py-4 w-[160px]">
-                        <div className="break-words whitespace-normal">
-                          {group.frequency || "—"}
-                        </div>
-                      </td>
-                    )}
-                    {visibleColumns.dueDate && (
-                      <td className="px-6 py-4 w-[140px]">
-                        <div className="break-words whitespace-normal">
-                          {formatDate(group.endDate)}
-                        </div>
-                      </td>
-                    )}
-                    {visibleColumns.status && (
-                      <td className="px-6 py-4 w-[130px]">
-                        <StatusBadge status={overallStatus(group)} />
-                      </td>
-                    )}
-                    {visibleColumns.checklist && (
-                      <td className="px-6 py-4 w-[120px]">
-                        <div className="break-words whitespace-normal flex items-center">
-                          {group.checklist?.length > 0 ? (
-                            <button
-                              type="button"
-                              className="cursor-pointer p-2 rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition"
-                              onClick={() => onViewChecklist(group)}
-                              title="View Checklist"
+
+                      {isCompletedTab &&
+                        visibleColumns.completedBy !== false && (
+                          <td className="px-6 py-4 w-[200px]">
+                            <div
+                              className={`break-words whitespace-normal ${!completedByName ? "text-center" : "text-left"}`}
                             >
-                              <List className="h-4 w-4" />
-                            </button>
-                          ) : (
-                            <button
-                              type="button"
-                              className="cursor-pointer p-2 rounded-lg bg-gray-100 text-gray-400 opacity-50"
-                              disabled
-                              title="No checklist available"
-                            >
-                              <List className="h-4 w-4" />
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    )}
-                  </tr>
-                ))
+                              <span
+                                className={
+                                  !completedByName
+                                    ? "flex items-center justify-center"
+                                    : ""
+                                }
+                              >
+                                {completedByName || "-"}
+                              </span>
+                            </div>
+                          </td>
+                        )}
+
+                      {isCompletedTab && visibleColumns.delay !== false && (
+                        <td className="px-6 py-4 w-[150px]">
+                          <div className="break-words whitespace-normal ">
+                            {getDelayInDays(group.endDate, completedDate)}
+                          </div>
+                        </td>
+                      )}
+
+                      {visibleColumns.status !== false && (
+                        <td className="px-6 py-4 w-[130px]">
+                          <StatusBadge status={overallStatus(group)} />
+                        </td>
+                      )}
+
+                      {visibleColumns.checklist !== false && (
+                        <td className="px-6 py-4 w-[120px]">
+                          <div className="break-words whitespace-normal flex items-center">
+                            {group.checklist?.length > 0 ? (
+                              <button
+                                type="button"
+                                className="cursor-pointer p-2 rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition"
+                                onClick={() => onViewChecklist(group)}
+                                title="View Checklist"
+                              >
+                                <List className="h-4 w-4" />
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                className="cursor-pointer p-2 rounded-lg bg-gray-100 text-gray-400 opacity-50"
+                                disabled
+                                title="No checklist available"
+                              >
+                                <List className="h-4 w-4" />
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      )}
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
@@ -914,7 +1023,7 @@ export default function ViewWorkshop() {
 
                       {isCompletedTab && visibleColumns.completedBy && (
                         <td className="px-6 py-4 w-[200px]">
-                          <div className="break-words whitespace-normal font-medium">
+                          <div className="break-words whitespace-normal">
                             {task.completedBy?.name || "-"}
                           </div>
                         </td>
@@ -922,7 +1031,7 @@ export default function ViewWorkshop() {
 
                       {isCompletedTab && visibleColumns.delay && (
                         <td className="px-6 py-4 w-[150px]">
-                          <div className="break-words whitespace-normal font-medium">
+                          <div className="break-words whitespace-normal">
                             {getDelayInDays(task.endDate, task.completedOn)}
                           </div>
                         </td>
@@ -1265,6 +1374,7 @@ export default function ViewWorkshop() {
                   onViewChecklist={handleViewChecklist}
                   visibleColumns={visibleColumns}
                   toggleColumnVisibility={toggleColumnVisibility}
+                  isCompletedTab={false}
                 />
               </div>
             </TabsContent>
@@ -1281,6 +1391,7 @@ export default function ViewWorkshop() {
                   onViewChecklist={handleViewChecklist}
                   visibleColumns={visibleColumns}
                   toggleColumnVisibility={toggleColumnVisibility}
+                  isCompletedTab={true}
                 />
               </div>
             </TabsContent>

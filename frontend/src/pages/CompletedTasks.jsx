@@ -59,15 +59,103 @@ import {
 } from "../components/ui/select";
 import { useLocation } from "react-router-dom";
 
+const formatDate = (dateStr) => {
+  if (!dateStr) return "N/A";
+  return new Date(dateStr).toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+};
+
+// Helper function to calculate delay in calendar days
+const getDelayInDays = (dueDate, completedDate) => {
+  if (!dueDate || !completedDate) return "N/A";
+
+  const due = new Date(dueDate);
+  const completed = new Date(completedDate);
+
+  due.setHours(0, 0, 0, 0);
+  completed.setHours(0, 0, 0, 0);
+
+  const diffTime = completed.getTime() - due.getTime();
+  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+  return diffDays > 0 ? `${diffDays} Day(s)` : "0 Days";
+};
+
 function TasksTable({
-  columns,
+  columns: userColumns = [],
   data = [],
   visibleColumns = {},
   toggleColumnVisibility,
   pagination = { page: 1, limit: 20, totalTasks: 0, totalPages: 1 },
   onPageChange,
   loading = false,
+  isCompletedTab = false,
 }) {
+  // 🚀 Completion-Specific Column Definitions for TanStack Table
+  const completionColumns = React.useMemo(() => {
+    if (!isCompletedTab) return [];
+
+    return [
+      {
+        id: "completedAt",
+        accessorKey: "completedOn",
+        header: "Completed At",
+        headerText: "Completed At",
+        meta: { width: "180px", minWidth: 180 },
+        cell: ({ row }) => {
+          const val = row.original.completedOn || row.original.updatedAt;
+          return <span>{val ? formatDate(val) : "N/A"}</span>;
+        },
+      },
+      {
+        id: "completedBy",
+        accessorKey: "completedBy",
+        header: "Completed By",
+        headerText: "Completed By",
+        meta: { width: "200px", minWidth: 200 },
+        cell: ({ row }) => {
+          const completedByObj = row.original.completedBy;
+          const name =
+            typeof completedByObj === "object"
+              ? completedByObj?.name
+              : completedByObj;
+
+          return (
+            <div className={!name ? "text-center" : "text-left"}>
+              <span
+                className={`font-medium ${!name ? "flex items-center justify-center" : ""}`}
+              >
+                {name || "-"}
+              </span>
+            </div>
+          );
+        },
+      },
+      // {
+      //   id: "delay",
+      //   accessorKey: "delay",
+      //   header: "Delay (Days)",
+      //   headerText: "Delay (Days)",
+      //   meta: { width: "150px", minWidth: 150 },
+      //   cell: ({ row }) => {
+      //     const due = row.original.endDate || row.original.plannedDate;
+      //     const completed = row.original.completedOn || row.original.updatedAt;
+      //     const delay = getDelayInDays(due, completed);
+
+      //     return <span className="font-medium">{delay}</span>;
+      //   },
+      // },
+    ];
+  }, [isCompletedTab]);
+
+  // Combine user provided base columns with completion columns if in Completed Tab
+  const allMasterColumns = React.useMemo(() => {
+    return [...userColumns, ...completionColumns];
+  }, [userColumns, completionColumns]);
+
   // Safe extraction of column headers
   const getHeaderText = (col) => {
     if (typeof col.header === "string") return col.header;
@@ -81,13 +169,13 @@ function TasksTable({
     return col.id || "Column";
   };
 
-  // Filter visible columns
+  // Filter visible columns for TanStack Table model
   const visibleColumnsData = React.useMemo(() => {
-    return columns.filter((col, index) => {
+    return allMasterColumns.filter((col, index) => {
       const columnKey = col.accessorKey || col.id || `column-${index}`;
       return visibleColumns[columnKey] !== false;
     });
-  }, [columns, visibleColumns]);
+  }, [allMasterColumns, visibleColumns]);
 
   const table = useReactTable({
     data,
@@ -95,9 +183,13 @@ function TasksTable({
     getCoreRowModel: getCoreRowModel(),
   });
 
-  const hiddenCardActive = Object.values(visibleColumns).some(
-    (visible) => visible === false,
-  );
+  // Check hidden status strictly for active tab columns
+  const hiddenCardActive = React.useMemo(() => {
+    return allMasterColumns.some((col, index) => {
+      const columnKey = col.accessorKey || col.id || `column-${index}`;
+      return visibleColumns[columnKey] === false;
+    });
+  }, [allMasterColumns, visibleColumns]);
 
   const { page, limit, totalTasks, totalPages } = pagination;
 
@@ -113,7 +205,7 @@ function TasksTable({
             </span>
           </div>
           <div className="flex flex-wrap gap-2">
-            {columns.map((col, index) => {
+            {allMasterColumns.map((col, index) => {
               const columnKey = col.accessorKey || col.id || `column-${index}`;
               if (visibleColumns[columnKey] === false) {
                 return (
@@ -191,7 +283,7 @@ function TasksTable({
                       colSpan={visibleColumnsData.length || 1}
                       className="px-6 py-8 text-center text-sm text-gray-500 dark:text-gray-400"
                     >
-                      Loading completed tasks...
+                      Loading tasks...
                     </td>
                   </tr>
                 ) : table.getRowModel().rows.length > 0 ? (
@@ -224,7 +316,9 @@ function TasksTable({
                       colSpan={visibleColumnsData.length || 1}
                       className="px-6 py-8 text-center text-sm text-gray-500 dark:text-gray-400"
                     >
-                      No completed tasks found.
+                      {isCompletedTab
+                        ? "No completed tasks found."
+                        : "No tasks found."}
                     </td>
                   </tr>
                 )}
@@ -232,7 +326,7 @@ function TasksTable({
             </table>
           </div>
 
-          {/* 🚀 Pagination Controls Footer */}
+          {/* Pagination Controls Footer */}
           <div className="px-6 py-3 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 flex items-center justify-between flex-wrap gap-4">
             <div className="text-xs text-gray-600 dark:text-gray-400">
               Showing{" "}
@@ -1440,6 +1534,7 @@ export default function CompletedTasks() {
                   visibleColumns={visibleColumns}
                   toggleColumnVisibility={toggleColumnVisibility}
                   loading={loading}
+                  isCompletedTab={true}
                   pagination={{
                     page,
                     limit,

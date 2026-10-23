@@ -453,6 +453,7 @@ exports.getCompletedTasks = async (req, res) => {
       })
       .populate('doer', 'name _id')
       .populate('department', 'name _id')
+      .populate('completedBy', 'name email')
       .lean();
 
     // 4. Batch Comments Check (Only for current page's 20 items)
